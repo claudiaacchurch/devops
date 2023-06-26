@@ -1,18 +1,46 @@
 name: Deploy to Amazon S3
 
+#defines when workflow should be run: when pushed on branch main
 on:
   push:
     branches:
-      - main  # Trigger the workflow on push or pull request to the main branch
-
+      - main 
+      
+#tasks of workflow defined: first run continuous integration by running tests
 jobs:
+  CI_job:
+    runs-on: ubuntu-latest
+    
+    #tasks to execute: 
+    #uses action to clone repo into runner's env so workflow can access contents
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11.4'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    
+    - name: run tests
+      run: |
+        python -m unittest sample_unit_tests.py
+
+    
   deploy:
+  #deploy won't run until CI_job succcessfully completed
+    needs: CI_job
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
+      
+    #uses credentials to interact with AWS services
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -20,6 +48,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-north-1  # Enter your AWS region
 
+#deploys code to Amazon s3: syncs specificied path of local with s3 bucket
+#--delete: deleted files in bucket not present in ./www/
+#--exclude: excludes .git & .github
     - name: Deploy to S3
       run: |
         aws s3 sync ./www/ s3://mybucket9089 --delete --exclude ".git/*" --exclude ".github/*"
